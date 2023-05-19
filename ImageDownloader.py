@@ -27,6 +27,8 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import StaleElementReferenceException
+
 
 class WebPageImageDownloader:
     def getRandomFilename():
@@ -69,9 +71,6 @@ class WebPageImageDownloader:
 
         driver.get(pageUrl)
         element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.TAG_NAME, 'a'))
-        )
-        element = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.TAG_NAME, 'img'))
         )
         # download image
@@ -82,10 +81,12 @@ class WebPageImageDownloader:
                 WebPageImageDownloader.downloadImage(imageUrl, outputPath, minDownloadSize)
 
         # get links to other pages
-        links = driver.find_elements(By.TAG_NAME, 'a')
-        for link in links:
-            if link:
-                href = link.get_attribute('href')
+        elements = WebDriverWait(driver, 10).until(
+            EC.presence_of_all_elements_located((By.TAG_NAME, 'a'))
+        )
+        for element in elements:
+            try:
+                href = element.get_attribute('href')
                 if href and WebPageImageDownloader.isSameDomain(pageUrl, href, baseUrl):
                     oldLen= len(pagesUrls)
                     pagesUrls.add(href)
@@ -94,6 +95,8 @@ class WebPageImageDownloader:
                             WebPageImageDownloader.downloadImage(href, outputPath, minDownloadSize)
                         else:
                             WebPageImageDownloader.downloadImagesFromWebPage_(driver, pagesUrls, href, outputPath, minDownloadSize, baseUrl, maxDepth, depth + 1)
+            except StaleElementReferenceException:
+                continue
 
     def downloadImagesFromWebPage(url, outputPath, minDownloadSize=None, baseUrl="", maxDepth=1):
         options = webdriver.ChromeOptions()
